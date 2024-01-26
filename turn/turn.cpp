@@ -3,10 +3,10 @@
 #include <ctime>
 #include <string>
 #include <limits>
-#define NOMINMAX
+#define NOMINMAX // Para não dar conflito com o <streamsize>::max()
 #include <windows.h> // Para mudar as cores dos textos no terminal
-#define UNDERLINE "\033[4m"
-#define CLOSEUNDERLINE "\033[0m"
+#define UNDERLINE "\033[4m" // Coloca underline
+#define CLOSEUNDERLINE "\033[0m" // Encerra underline
 
 HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE); // Para mudar as cores dos textos
 
@@ -36,8 +36,8 @@ public:
         life -= damage;
     }
 
-    void lessEnergy() {
-        energy -= 5;
+    void lessEnergy(int stamina) {
+        energy -= stamina;
     }
 
     bool hasGivenUp() const {
@@ -75,7 +75,7 @@ public:
         case 0:
             std::cout << UNDERLINE << "Defense failed" << CLOSEUNDERLINE << std::endl;
             stopDefending(); // Se a defesa falhar, desativa o estado de defesa
-            lessEnergy();
+            lessEnergy(2);
             break;
         case 1:
         case 2:
@@ -84,7 +84,7 @@ public:
             // Atualiza o multiplicador de defesa para reduzir o dano do próximo ataque
             defenseMultiplier = 0.5; // Reduz o dano pela metade durante a defesa
             startDefending(); // Ativa o estado de defesa
-            lessEnergy();
+            lessEnergy(2);
             break;
         }
     }
@@ -95,7 +95,7 @@ public:
 
     void heal() {
         life += 15;
-        lessEnergy();
+        lessEnergy(3);
     }
 
     std::string randomOption() {
@@ -142,9 +142,12 @@ void playerTurn(player& newPlayer, player& newEnemy) {
                 std::cout << UNDERLINE << "You attacked and caused " << damageDealt << " of damage" << CLOSEUNDERLINE << std::endl;
             }
             newEnemy.takeDamage(damageDealt);
-            newPlayer.lessEnergy();
+            newPlayer.lessEnergy(5);
+
+            // Redefine o multiplicador de defesa para o próximo turno do inimigo
+            newEnemy.stopDefending();
+            newEnemy.resetDefenseMultiplier();
         } else if (action == "defend" || action == "DEFEND") {
-            newPlayer.startDefending(); // Ativa a defesa
             newPlayer.defend(); // Chama o método de defesa
         } else if (action == "rest" || action == "REST") {
             newPlayer.rest();
@@ -170,7 +173,7 @@ void enemyTurn(player& newPlayer, player& newEnemy) {
     std::cout << "> Enemy's turn. They chose: " << enemyOption << std::endl;
 
     if (enemyOption == "defend") { // NÃO FUNCIONAVA SE NÃO FOSSE ASSIM
-        newEnemy.defend();
+        newEnemy.defend(); // Chama o método de defesa
     } else if (enemyOption == "attack") {
         int damageTaken = damageE * newPlayer.getDefenseMultiplier();
         if (newPlayer.isDefendingNow() && damageTaken > 5) {
@@ -186,7 +189,7 @@ void enemyTurn(player& newPlayer, player& newEnemy) {
             std::cout << UNDERLINE << "Enemy attacked and caused " << damageTaken << " of damage" << CLOSEUNDERLINE << std::endl;
         }
         newPlayer.takeDamage(damageTaken);
-        newEnemy.lessEnergy();
+        newEnemy.lessEnergy(5);
 
         // Redefine o multiplicador de defesa para o próximo turno do jogador
         newPlayer.stopDefending();
@@ -253,7 +256,6 @@ int main() {
         std::cout << "[STARTING BATTLE]" << std::endl << std::endl;
 
         while (newPlayer.getLife() > 0 && newEnemy.getLife() > 0 && newPlayer.getEnergy() > 0 && newEnemy.getEnergy() > 0) {
-            std::cout << "==================================" << std::endl << std::endl;
             displayBattleStatus(newPlayer, newEnemy);
 
             playerTurn(newPlayer, newEnemy);
@@ -269,7 +271,6 @@ int main() {
             displayBattleStatus(newPlayer, newEnemy);
 
             enemyTurn(newPlayer, newEnemy);
-
             std::cout << std::endl << "==================================" << std::endl << std::endl;
         }
 
