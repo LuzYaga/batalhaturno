@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <limits>
+#define NOMINMAX
 #include <windows.h> // Para mudar as cores dos textos no terminal
 #define UNDERLINE "\033[4m"
 #define CLOSEUNDERLINE "\033[0m"
@@ -12,6 +14,7 @@ class player {
 private:
     int life = 100;
     int energy = 20;
+    bool gaveUp = false;
     bool isDefending = false;
     double defenseMultiplier = 1.0; // Multiplicador para reduzir o dano caso esteja defendendo
 
@@ -35,6 +38,14 @@ public:
 
     void lessEnergy() {
         energy -= 5;
+    }
+
+    bool hasGivenUp() const {
+        return gaveUp;
+    }
+
+    void giveUp() {
+        gaveUp = true;
     }
 
     double getDefenseMultiplier() const {
@@ -114,10 +125,10 @@ void playerTurn(player& newPlayer, player& newEnemy) {
     std::string action;
 
     do {
-        std::cout << "> Your turn. Choose an action: attack, defend, rest, heal" << std::endl << "> ";
-        std::cin >> action;
+        std::cout << "> Your turn. Choose an action: attack, defend, rest, heal, give up" << std::endl << "> ";
+        std::getline(std::cin, action);
 
-        if (action == "attack") {
+        if (action == "attack" || action == "ATTACK") { // As ações podem ser com letras minúsculas ou maiúsculas
             if (newEnemy.isDefendingNow() && damageDealt > 5) {
                 std::cout << UNDERLINE << "You attacked, but enemy's defense reduced the damage!" << CLOSEUNDERLINE << std::endl;
             }
@@ -132,19 +143,24 @@ void playerTurn(player& newPlayer, player& newEnemy) {
             }
             newEnemy.takeDamage(damageDealt);
             newPlayer.lessEnergy();
-        } else if (action == "defend") {
+        } else if (action == "defend" || action == "DEFEND") {
             newPlayer.startDefending(); // Ativa a defesa
             newPlayer.defend(); // Chama o método de defesa
-        } else if (action == "rest") {
+        } else if (action == "rest" || action == "REST") {
             newPlayer.rest();
             std::cout << UNDERLINE << "Gained 5 points of stamina after taking a short break" << CLOSEUNDERLINE << std::endl;
-        } else if (action == "heal") {
+        } else if (action == "heal" || action == "HEAL") {
             newPlayer.heal();
             std::cout << UNDERLINE << "Healed 15 points of life" << CLOSEUNDERLINE << std::endl;
+        } else if (action == "give up" || action == "GIVE UP" || action == "giveup" || action == "GIVEUP") {
+            std::cout << UNDERLINE << "You chose to give up. The battle is over" << CLOSEUNDERLINE << std::endl;
+            newPlayer.giveUp();
+            break;
         } else {
             std::cout << "Invalid option. Please choose a valid action." << std::endl;
         }
-    } while (action != "attack" && action != "defend" && action != "rest" && action != "heal");
+    } while (action != "attack" && action != "ATTACK" && action != "defend" && action != "DEFEND" &&
+             action != "rest" && action != "REST" && action != "heal" && action != "HEAL");
 }
 
 // Função para agir de acordo com a escolha do inimigo
@@ -204,9 +220,11 @@ void displayBattleStatus(const player& newPlayer, const player& newEnemy) {
 // Função para exibir a mensagem de resultado final
 void displayBattleResult(const player& newPlayer, const player& newEnemy) {
     SetConsoleTextAttribute(h,12);
-    if (newPlayer.getLife() > 0 && newPlayer.getEnergy() > 0) {
+    if (newEnemy.getLife() <= 0 || newEnemy.getEnergy() <= 0) {
         std::cout << "You won the battle with " << newPlayer.getLife() << " health points remaining!" << std::endl;
-    } else if (newEnemy.getLife() > 0 && newEnemy.getEnergy() > 0) {
+    } else if (newPlayer.hasGivenUp()) { // Caso o jogador desista da partida
+        std::cout << "You gave up, the enemy won with " << newEnemy.getLife() << " health points remaining!" << std::endl;
+    } else if (newPlayer.getLife() <= 0 || newPlayer.getEnergy() <= 0) {
         std::cout << "The enemy won the battle with " << newEnemy.getLife() << " health points remaining!" << std::endl;
     } else {
         std::cout << "It's a Draw!!!" << std::endl; // Caso 1 jogador perca toda a vida mas o outro perca a estamina
@@ -227,30 +245,58 @@ void displayBattleResult(const player& newPlayer, const player& newEnemy) {
 
 int main() {
     srand(time(NULL));
-    player newPlayer; // Cria o objeto do jogador
-    player newEnemy; // Cria o objeto do inimigo
+    bool loop;
+    do {
+        player newPlayer; // Cria o objeto do jogador
+        player newEnemy; // Cria o objeto do inimigo
 
-    std::cout << "[STARTING BATTLE]" << std::endl << std::endl;
+        std::cout << "[STARTING BATTLE]" << std::endl << std::endl;
 
-    while (newPlayer.getLife() > 0 && newEnemy.getLife() > 0 && newPlayer.getEnergy() > 0 && newEnemy.getEnergy() > 0) {        
-        displayBattleStatus(newPlayer, newEnemy);
+        while (newPlayer.getLife() > 0 && newEnemy.getLife() > 0 && newPlayer.getEnergy() > 0 && newEnemy.getEnergy() > 0) {
+            std::cout << "==================================" << std::endl << std::endl;
+            displayBattleStatus(newPlayer, newEnemy);
+
+            playerTurn(newPlayer, newEnemy);
+
+            std::cout << std::endl << "==================================" << std::endl << std::endl;
+
+            if (newPlayer.getLife() <= 0 || newEnemy.getLife() <= 0 || newPlayer.getEnergy() <= 0 || newEnemy.getEnergy() <= 0) {
+                break;
+            } else if (newPlayer.hasGivenUp()) {
+                break;
+            }
+
+            displayBattleStatus(newPlayer, newEnemy);
+
+            enemyTurn(newPlayer, newEnemy);
+
+            std::cout << std::endl << "==================================" << std::endl << std::endl;
+        }
+
+        displayBattleResult(newPlayer, newEnemy);
+        std::string newBattle;
+
+        do {
+            std::cout << "> Do you want to start a new battle? (yes/no): "; 
+            std::cin >> newBattle;
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Limpa o buffer de entrada
+            std::cout << std::endl;
         
-        playerTurn(newPlayer, newEnemy);
+            if (newBattle == "no" || newBattle == "NO" || newBattle == "n" || newBattle == "N") {
+                loop = false;
+                break;  // Sai do loop principal se o jogador não quiser iniciar uma nova batalha
+            } else if (newBattle == "yes" || newBattle == "YES" || newBattle == "y" || newBattle == "Y") {
+                loop = true;
+                break; // Continua o loop se o jogador desejar iniciar uma nova partida
+            } else {
+                std::cout << "Invalid option. Please enter 'yes' or 'no'." << std::endl;
+            }
+        } while (true);
 
-        std::cout << std::endl << "==================================" << std::endl << std::endl;
-
-        if (newPlayer.getLife() <= 0 || newEnemy.getLife() <= 0 || newPlayer.getEnergy() <= 0 || newEnemy.getEnergy() <= 0) {
-            break;
-        }
-
-        displayBattleStatus(newPlayer, newEnemy);
-
-        enemyTurn(newPlayer, newEnemy);
-
-        std::cout << std::endl << "==================================" << std::endl << std::endl;
-        }
-
-    displayBattleResult(newPlayer, newEnemy);
-
+       std::cout << std::endl;
+    } while (loop);
+    SetConsoleTextAttribute(h, 3);
+    std::cout << "Thanks for playing!";
+    SetConsoleTextAttribute(h, 7);
     return 0;
 }
