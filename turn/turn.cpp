@@ -14,6 +14,7 @@ class player {
 private:
     int life = 100;
     int energy = 20;
+    bool hasHealed = false;
     bool gaveUp = false;
     bool isDefending = false;
     double defenseMultiplier = 1.0; // Multiplicador para reduzir o dano caso esteja defendendo
@@ -38,6 +39,10 @@ public:
 
     void lessEnergy(int stamina) {
         energy -= stamina;
+    }
+    
+    bool getHasHealed() const {
+        return hasHealed;
     }
 
     bool hasGivenUp() const {
@@ -75,7 +80,7 @@ public:
         case 0:
             std::cout << UNDERLINE << "Defense failed" << CLOSEUNDERLINE << std::endl;
             stopDefending(); // Se a defesa falhar, desativa o estado de defesa
-            lessEnergy(2);
+            lessEnergy(3);
             break;
         case 1:
         case 2:
@@ -84,36 +89,83 @@ public:
             // Atualiza o multiplicador de defesa para reduzir o dano do próximo ataque
             defenseMultiplier = 0.5; // Reduz o dano pela metade durante a defesa
             startDefending(); // Ativa o estado de defesa
-            lessEnergy(2);
+            lessEnergy(3);
             break;
         }
     }
 
     void rest() {
         energy += 5;
+        if (energy > 20) {
+            energy = 20;
+        }
     }
 
     void heal() {
-        life += 15;
-        lessEnergy(3);
+        life += 30;
+        if (life > 100) {
+            life = 100;
+        }
+        lessEnergy(4);
+        hasHealed = true;
     }
 
+    // Escolhe uma ação aleatória para o inimigo de acordo com sua vida e estamina
     std::string randomOption() {
         int option = rand() % 4;
-
-        switch (option) {
-        case 0:
-            return "attack";
-            break;
-        case 1:
-            return "defend";
-            break;
-        case 2:
-            return "rest";
-            break;
-        case 3:
-            return "heal";
-            break;
+        
+        if ((life == 100 && energy == 20) || (hasHealed == true && energy == 20)) {
+            switch (option) {
+                case 0:
+                case 1:
+                    return "attack";
+                    break;
+                case 2:
+                case 3:
+                    return "defend";
+                    break;
+            }
+        } else if ((life == 100 && energy < 20) || (hasHealed == true && energy < 20)) {
+            switch (option) {
+                case 0:
+                    return "rest";
+                    break;
+                case 1:
+                    return "defend";
+                    break;
+                case 2:
+                case 3:
+                    return "attack";
+                    break;
+            }
+        } else if (life < 100 && energy == 20 && hasHealed == false) {
+            switch (option) {
+                case 0:
+                    return "heal";
+                    break;
+                case 1:
+                    return "defend";
+                    break;
+                case 2:
+                case 3:
+                    return "attack";
+                    break;
+            }
+        } else {
+            switch (option) {
+            case 0:
+                return "attack";
+                break;
+            case 1:
+                return "defend";
+                break;
+            case 2:
+                return "rest";
+                break;
+            case 3:
+                return "heal";
+                break;
+            }
         }
     }
 };
@@ -150,17 +202,30 @@ void playerTurn(player& newPlayer, player& newEnemy) {
         } else if (action == "defend" || action == "DEFEND") {
             newPlayer.defend(); // Chama o método de defesa
         } else if (action == "rest" || action == "REST") {
-            newPlayer.rest();
-            std::cout << UNDERLINE << "Gained 5 points of stamina after taking a short break" << CLOSEUNDERLINE << std::endl;
-        } else if (action == "heal" || action == "HEAL") {
-            newPlayer.heal();
-            std::cout << UNDERLINE << "Healed 15 points of life" << CLOSEUNDERLINE << std::endl;
+            if (newPlayer.getEnergy() == 20) { // Se estiver com estamina máxima não é possível descansar
+                std::cout << UNDERLINE << "Maximum stamina" << CLOSEUNDERLINE << std::endl;
+                action = "";
+            } else {
+                newPlayer.rest();
+                std::cout << UNDERLINE << "Gained 5 points of stamina after taking a short break" << CLOSEUNDERLINE << std::endl;
+            }
+        } else if (action == "heal" || action == "HEAL") { // Se estiver com vida máxima não é possível se curar
+            if (newPlayer.getHasHealed() == true) {
+                std::cout << UNDERLINE << "You can only heal one time per battle!" << CLOSEUNDERLINE << std::endl;
+                action = "";
+            } else if (newPlayer.getLife() == 100) {
+                std::cout << UNDERLINE << "Maximum health" << CLOSEUNDERLINE << std::endl;
+                action = "";
+            } else {
+                newPlayer.heal();
+                std::cout << UNDERLINE << "Healed 30 points of life" << CLOSEUNDERLINE << std::endl;
+            }
         } else if (action == "give up" || action == "GIVE UP" || action == "giveup" || action == "GIVEUP") {
             std::cout << UNDERLINE << "You chose to give up. The battle is over" << CLOSEUNDERLINE << std::endl;
             newPlayer.giveUp();
             break;
         } else {
-            std::cout << "Invalid option. Please choose a valid action." << std::endl;
+            std::cout << "Invalid option. Please choose a valid action" << std::endl;
         }
     } while (action != "attack" && action != "ATTACK" && action != "defend" && action != "DEFEND" &&
              action != "rest" && action != "REST" && action != "heal" && action != "HEAL");
@@ -199,7 +264,7 @@ void enemyTurn(player& newPlayer, player& newEnemy) {
         std::cout << UNDERLINE << "Gained 5 points of stamina after taking a short break" << CLOSEUNDERLINE << std::endl;
     } else if (enemyOption == "heal") {
         newEnemy.heal();
-        std::cout << UNDERLINE << "Healed 15 points of life" << CLOSEUNDERLINE << std::endl;
+        std::cout << UNDERLINE << "Healed 30 points of life" << CLOSEUNDERLINE << std::endl;
     }
 }
 
